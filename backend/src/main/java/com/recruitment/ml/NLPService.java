@@ -1,13 +1,18 @@
 package com.recruitment.ml;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
 public class NLPService {
+
+    @Autowired(required = false)
+    private OpenAIService openAIService;
 
     // Common programming skills dictionary
     private static final Set<String> PROGRAMMING_SKILLS = Set.of(
@@ -31,9 +36,26 @@ public class NLPService {
     );
 
     /**
-     * Extract skills from resume text using pattern matching
+     * Extract skills from resume text using AI or pattern matching
+     * Uses OpenAI if available, falls back to pattern matching
      */
     public Set<String> extractSkills(String resumeText) {
+        // Try OpenAI first if available
+        if (openAIService != null && openAIService.isAvailable()) {
+            Set<String> aiSkills = openAIService.extractSkillsWithAI(resumeText);
+            if (!aiSkills.isEmpty()) {
+                return aiSkills;
+            }
+        }
+
+        // Fallback to pattern matching
+        return extractSkillsBasic(resumeText);
+    }
+
+    /**
+     * Extract skills using basic pattern matching (fallback method)
+     */
+    private Set<String> extractSkillsBasic(String resumeText) {
         Set<String> extractedSkills = new HashSet<>();
         String lowerText = resumeText.toLowerCase();
 
@@ -83,14 +105,30 @@ public class NLPService {
     }
 
     /**
-     * Perform basic sentiment analysis on text
-     * Returns a score between -1 (negative) and 1 (positive)
+     * Perform sentiment analysis on text using AI or basic pattern matching
+     * Returns a score between 0 (negative) and 1 (positive)
      */
     public double analyzeSentiment(String text) {
         if (text == null || text.isEmpty()) {
-            return 0.0;
+            return 0.5;
         }
 
+        // Try OpenAI first if available
+        if (openAIService != null && openAIService.isAvailable()) {
+            Map<String, Object> aiSentiment = openAIService.analyzeSentimentWithAI(text);
+            if (aiSentiment.containsKey("score")) {
+                return (double) aiSentiment.get("score");
+            }
+        }
+
+        // Fallback to basic sentiment analysis
+        return analyzeSentimentBasic(text);
+    }
+
+    /**
+     * Perform basic sentiment analysis using keyword matching
+     */
+    private double analyzeSentimentBasic(String text) {
         String lowerText = text.toLowerCase();
 
         // Positive words
@@ -126,7 +164,9 @@ public class NLPService {
             return 0.5; // neutral sentiment
         }
 
-        return (double) (positiveCount - negativeCount) / totalCount;
+        // Normalize to 0-1 range
+        double rawScore = (double) (positiveCount - negativeCount) / totalCount;
+        return (rawScore + 1.0) / 2.0; // Convert from [-1, 1] to [0, 1]
     }
 
     /**

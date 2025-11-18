@@ -55,7 +55,3 @@ public class Interview {
         createdAt = LocalDateTime.now();
     }
 }
-
-enum InterviewStatus {
-    SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW
-}
